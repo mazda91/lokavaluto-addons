@@ -1,0 +1,86 @@
+version: '3.5'
+
+networks:
+  mlc_net:
+    driver: bridge
+    name: mlc_net
+
+services:
+  odoo:
+    image: docker.0k.io/mirror/odoo:rc_12.0-MYC-INIT
+    container_name: odoo_server
+    ports:
+      - 8069:8069
+    command:
+      - odoo
+      - --config=/opt/odoo/auto/odoo.conf
+      - --workers=1
+      - -i base,l10n_fr
+      - --database=odoo
+      - --addons-path=/opt/odoo/auto/my_addons,/opt/odoo/auto/addons
+    environment:
+      - ADMIN_PASSWORD=${ODOO_ADMIN_PASSWORD}
+      - INITIAL_LANG=fr_FR
+      - LIST_DB='true'
+      - PGDATABASE=${PG_DATABASE}
+      - PGHOST=postgres
+      - PGPASSWORD=${PG_PASS}
+      - PGUSER=${PG_USER}
+    restart: unless-stopped
+    tty: true
+    volumes:
+    ## Volume is changed from normal 'compose' build
+      - odoo-data:/var/lib/odoo:rw
+      - ./my_addons:/opt/odoo/auto/my_addons 
+    networks:
+      - mlc_net
+
+
+  postgres:
+    build: ${CHARM_STORE}/postgres/build
+    container_name: postgres_odoo
+    restart: unless-stopped
+    volumes:
+      ## Volume is changed from normal 'compose' build
+      - postgres-data:/var/lib/postgresql/data:rw
+    ## Was added, differing from the normal 'compose' build
+    environment:
+      - POSTGRES_ROOT_PASSWORD
+      - PG_DATABASE
+      - PG_USER
+      - PG_PASS
+    networks:
+      - mlc_net
+
+  cyclos-app:
+    image: cyclos/cyclos:4.11.2
+    container_name: cyclos-app
+    environment:
+    - DB_HOST=cyclos-db
+    - DB_NAME=${POSTGRES_DB}
+    - DB_USER=${POSTGRES_USER}
+    - DB_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+    - '${CYCLOS_PORT}:8080'
+    volumes:
+      - ./etc/cyclos/logs:/var/log/cyclos
+    networks:
+      - mlc_net
+   
+  cyclos-db:
+    image: cyclos/db
+    container_name: cyclos-db
+    environment:
+    - POSTGRES_DB=${POSTGRES_DB}
+    - POSTGRES_USER=${POSTGRES_USER}
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./data/cyclos/postgresql:/var/lib/postgresql/data
+      - ./etc/cyclos/dump/cyclos_dump.sql:/cyclos.sql
+    networks:
+      - mlc_net
+
+## new section
+volumes:
+  odoo-data:
+  postgres-data:
