@@ -30,8 +30,12 @@ services:
     tty: true
     volumes:
     ## Volume is changed from normal 'compose' build
+      - ./etc/cyclos:/cyclos
       - odoo-data:/var/lib/odoo:rw
       - ./my_addons:/opt/odoo/auto/my_addons 
+    depends_on:
+      - postgres
+      - cyclos-app
     networks:
       - mlc_net
 
@@ -53,9 +57,15 @@ services:
       - mlc_net
 
   cyclos-app:
-    image: cyclos/cyclos:4.11.2
+    build: .
     container_name: cyclos-app
     environment:
+    - CURRENCY_SLUG=${CURRENCY_SLUG}
+    - CURRENCY_SYMBOL=${CURRENCY_SYMBOL}
+    - ENV=${ENV}
+    - SESSION_TIMEOUT=${SESSION_TIMEOUT}
+    - MIN_LENGTH_PWD=${MIN_LENGTH_PWD}
+    - MAX_LENGTH_PWD=${MAX_LENGTH_PWD} 
     - DB_HOST=cyclos-db
     - DB_NAME=${POSTGRES_DB}
     - DB_USER=${POSTGRES_USER}
@@ -63,7 +73,10 @@ services:
     ports:
     - '${CYCLOS_PORT}:8080'
     volumes:
-      - ./etc/cyclos/logs:/var/log/cyclos
+      - ./etc/cyclos:/cyclos
+      - ./logs/cyclos:/var/log/cyclos
+    depends_on:
+      - cyclos-db
     networks:
       - mlc_net
    
@@ -75,8 +88,8 @@ services:
     - POSTGRES_USER=${POSTGRES_USER}
     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
+      - ./etc/cyclos/dump/cyclos.sql:/docker-entrypoint-initdb.d/cyclos.sql
       - ./data/cyclos/postgresql:/var/lib/postgresql/data
-      - ./etc/cyclos/dump/cyclos_dump.sql:/cyclos.sql
     networks:
       - mlc_net
 
